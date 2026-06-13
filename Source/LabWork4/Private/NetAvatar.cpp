@@ -8,6 +8,8 @@ ANetAvatar::ANetAvatar()
 
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);
+
+    MovementScale = 1.0f;
 }
 
 void ANetAvatar::BeginPlay()
@@ -40,7 +42,7 @@ void ANetAvatar::MoveForward(float Scale)
     FRotator Rotation = GetController()->GetControlRotation();
     FRotator YawRotation(0.0f, Rotation.Yaw, 0.0f);
     FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-    AddMovementInput(ForwardDirection, Scale);
+    AddMovementInput(ForwardDirection, Scale * MovementScale);
 }
 
 void ANetAvatar::MoveRight(float Scale)

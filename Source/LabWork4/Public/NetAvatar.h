@@ -23,6 +23,9 @@ public:
     virtual void BeginPlay() override;
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    float MovementScale;
+
 private:
     void MoveForward(float Amount);
     void MoveRight(float Amount);

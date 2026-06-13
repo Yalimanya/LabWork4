@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "NetGameInstance.h" // FSPlayerInfo için eklendi
 #include "Engine/DataTable.h"
+#include "Net/UnrealNetwork.h"
 #include "NetBaseCharacter.generated.h"
 
-
+// 1. Enum Güncellendi (IsFemale yerine BP_BodyType eklendi) 
 UENUM(BlueprintType)
 enum class EBodyPart : uint8
 {
@@ -15,11 +17,11 @@ enum class EBodyPart : uint8
     BP_Hands = 3,
     BP_Legs = 4,
     BP_Beard = 5,
-    BP_Eyebrows = 6, // Yeni Eklenen Yuva
-    BP_COUNT = 7     // Toplam 7 oldu
+    BP_BodyType = 6, // Yeni eklenen
+    BP_COUNT = 7
 };
 
-// 2. Data Table için Satır Yapısı
+// 2. Data Table Struct'ı aynı kalıyor 
 USTRUCT(BlueprintType)
 struct FSMeshAssetList : public FTableRowBase
 {
@@ -32,35 +34,6 @@ struct FSMeshAssetList : public FTableRowBase
     TArray<UStaticMesh*> ListStatic;
 };
 
-// 3. Karakterin Seçtiği Parçaların İndeksleri ve Cinsiyet
-USTRUCT(BlueprintType)
-struct FSBodyPartSelection
-{
-    GENERATED_USTRUCT_BODY()
-
-    UPROPERTY()
-    int Indices[(int)EBodyPart::BP_COUNT];
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    bool isFemale;
-};
-
-// 4. Ağ Üzerinde Taşınacak Ana Oyuncu Verisi
-USTRUCT(BlueprintType)
-struct FSPlayerInfo
-{
-    GENERATED_USTRUCT_BODY()
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FText Nickname;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    FSBodyPartSelection BodyParts;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    bool Ready;
-};
-
 UCLASS()
 class LABWORK4_API ANetBaseCharacter : public ACharacter
 {
@@ -71,33 +44,65 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    virtual void OnConstruction(const FTransform& Transform) override;
 
 public:
     virtual void Tick(float DeltaTime) override;
-    virtual void OnConstruction(const FTransform& Transform) override;
 
-    // --- ÖZELLEŞTİRME (CUSTOMIZATION) FONKSİYONLARI ---
+    // --- PHASE 2: YENİ ÖZELLEŞTİRME (CUSTOMIZATION) FONKSİYONLARI --- 
+    UFUNCTION(BlueprintPure)
+    FString GetCustomizationData();
+
+    void ParseCustomizationData(FString Data);
+
     UFUNCTION(BlueprintCallable)
     void ChangeBodyPart(EBodyPart index, int value, bool DirectSet);
 
     UFUNCTION(BlueprintCallable)
     void ChangeGender(bool isFemale);
 
-    void UpdateBodyParts();
-
-    static FSMeshAssetList* GetBodyPartList(EBodyPart part, bool isFemale);
-
-    // --- AĞ (REPLICATION) DEĞİŞKENLERİ VE FONKSİYONLARI ---
-    UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_PlayerInfoChanged)
-    FSBodyPartSelection PartSelection;
-
     UFUNCTION(Server, Reliable)
     void SubmitPlayerInfoToServer(FSPlayerInfo Info);
 
-    UFUNCTION()
-    void OnRep_PlayerInfoChanged();
+    // Blueprint tarafında takım renklerini (Kırmızı/Mavi) ayarlamak için kullanılacak 
+    UFUNCTION(BlueprintImplementableEvent)
+    void OnPlayerInfoChanged();
 
-    // --- KOŞMA (RUN) MEKANİĞİ ---
+    // PlayerState ve Info'nun gelmesini beklemek için Timer fonksiyonları 
+    UFUNCTION()
+    void CheckPlayerState();
+
+    UFUNCTION()
+    void CheckPlayerInfo();
+
+    // --- VÜCUT PARÇASI BİLEŞENLERİ (COMPONENTS) --- 
+    // EditAnywhere ve BlueprintReadWrite yapılarak Blueprint'e açıldılar
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    USkeletalMeshComponent* PartFace;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UStaticMeshComponent* PartHair;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UStaticMeshComponent* PartBeard;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UStaticMeshComponent* PartEyes;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    USkeletalMeshComponent* PartHands;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    USkeletalMeshComponent* PartLegs;
+
+    // Assignment 1'den kalan kaşlar (Eğer hata verirse silebilirsin, Phase 2'de zorunlu değil)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UStaticMeshComponent* PartEyebrows;
+
+    // Verinin tam olarak alınıp alınmadığını kontrol eden bayrak 
+    bool PlayerInfoReceived;
+
+    // --- KOŞMA (RUN) MEKANİĞİ (Assignment 2 - Phase 1'den kalma) ---
     UPROPERTY(Transient, ReplicatedUsing = OnRep_IsRunning)
     bool bIsRunning;
 
@@ -111,25 +116,13 @@ public:
     void StopRunning();
 
 private:
-    // --- VÜCUT PARÇASI BİLEŞENLERİ (COMPONENTS) ---
-    UPROPERTY()
-    USkeletalMeshComponent* PartFace;
+    // --- PHASE 2: YENİ VERİ DEPOLAMA YÖNTEMİ --- 
+    // Artık struct yerine bu diziyi kullanıyoruz
+    int BodyPartIndices[(int)EBodyPart::BP_COUNT];
 
-    UPROPERTY()
-    UStaticMeshComponent* PartHair;
+    void UpdateBodyParts();
+    static FSMeshAssetList* GetBodyPartList(EBodyPart part, bool isFemale);
 
-    UPROPERTY()
-    UStaticMeshComponent* PartBeard;
-
-    UPROPERTY()
-    UStaticMeshComponent* PartEyes;
-
-    UPROPERTY()
-    USkeletalMeshComponent* PartHands;
-
-    UPROPERTY()
-    USkeletalMeshComponent* PartLegs;
-
-    UPROPERTY()
-    UStaticMeshComponent* PartEyebrows; // Kaşlar
+    // Ağdan gelen veriyi belirli aralıklarla kontrol etmek için zamanlayıcı 
+    FTimerHandle ClientDataCheckTimer;
 };
