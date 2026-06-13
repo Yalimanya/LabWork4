@@ -83,3 +83,6 @@ DerivedDataCache/*
 /Homework4.sln
 /.vsconfig
 /Content/Meshes
+/Content/Geometry
+/Content/Mannequin
+/Content/StylizedModularChar
